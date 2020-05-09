@@ -1,7 +1,7 @@
-from main import compare, Player
+from main import compare, Player, Node, CircularLinkedList
 
 
-def main():
+def test():
     # Test all of the possible outcomes of a comparison
     pool=['r', 'a', 'c', 'd', 'x', 'z']
     # Comparison is valid
@@ -30,5 +30,23 @@ def main():
     print()
     print()
 
+    llist=CircularLinkedList(['a', 'b', 'c', 'd', 'e'])
+    print(llist)
 
-main()
+    llist.add_node(Node('f'))
+    print(llist)
+
+    llist.remove_node(Node('b'))
+    print(llist)
+    print()
+    print()
+
+    llist2 = CircularLinkedList()
+    print(llist2)
+    llist2.add_node(Node('a'))
+    print(llist2)
+    llist2.add_node(Node('b'))
+    print(llist2)
+
+
+test()

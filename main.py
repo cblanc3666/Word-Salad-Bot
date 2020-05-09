@@ -14,26 +14,55 @@ def main():
         for i in range(distribution[letter]):
             tile_bag.append(letter)
 
-    players = []
-    command = ""
+    players = CircularLinkedList()
+    response = ""
+    while True:
+        response = input("What is your name and username? (user:response) ") # TO BE REPLACED WITH DISCORD.PY
+
+        # Checks for invalid input
+        if ':' not in response:
+            print("Invalid Input: ':' not in input")
+        elif response[-1] == ':':
+            print("Invalid Input: user not specified")
+        elif response[0] == ':':
+            print("Invalid Input: response not included")
+
+        else:
+            response_tup = split(response)
+
+            # Checks to see if game is ready to be played
+            if response_tup[1] == "!play":
+                break
+
+            # Creates player and adds it to players
+            player = Player(response_tup[1], response_tup[0])
+            if players.head is None:    #grants vip privileges if player is first in players
+                player.vip = True
+            players.add_node(Node(player))
+            print(players)
+
+        print()
 
 
 # Player has a name and a list of words
 class Player:
-    def __init__(self, name, user):
+    def __init__(self, name, user=None):
         self.name = name    # The in-game name a player uses
         self.user = user    # The discord username of the player
         self.words = []
         self.vip = False
+
+    def __str__(self):
+        rtn = "{}: {}".format(self.user, self.name)
+        if self.vip:
+            rtn += " (VIP)"
+        return rtn
 
     def add_word(self, word):
         self.words.append(word)
 
     def remove_word(self, word):
         self.words.remove(word)
-
-    def is_vip(self):
-        vip = True
 
 
 class Node:
@@ -57,14 +86,16 @@ class CircularLinkedList:
             node.next = self.head   # links the last node to the first
 
     def __repr__(self):
+        if self.head is None:
+            return "List is Empty"
         node = self.head
         nodes = []
         counter = 0
         while True:
-            nodes.append(node.data)
+            nodes.append(str(node.data))
             node = node.next
             if node == self.head:   # if all nodes have been added to list
-                nodes.append(node.data)
+                nodes.append(str(node.data))
                 break
         nodes.append("...")
         return " -> ".join(nodes)
@@ -78,9 +109,10 @@ class CircularLinkedList:
                 return
 
     def add_node(self, node):   #adds node to the "end" of the circular linked list
-        if not self.head:
+        if self.head is None:
             self.head = node
-            return
+            self.head.next = self.head
+            return "empty"
         for current_node in self:
             if current_node.next == self.head:  # if the "end" has been reached
                 current_node.next = node    #insert node
@@ -116,6 +148,16 @@ def str_to_list(string):
     for letter in string:
         letters.append(letter)
     return letters
+
+
+# Splits string into two parts based on the location of a semicolon
+def split(string):
+    index = 0
+    for i in range(len(string)):
+        if string[i] == ':':
+            index = i
+            break
+    return string[0:index], string[index + 1:len(string)]
 
 
 main()
