@@ -1,47 +1,84 @@
 import random
-
+import discord
 
 distribution = {'a': 13, 'b': 3, 'c': 3, 'd': 6, 'e': 18, 'f': 3, 'g': 4, 'h': 3, 'i': 12, 'j': 2, 'k': 2, 'l': 5,
                 'm': 3, 'n': 8, 'o': 11, 'p': 3, 'q': 2, 'r': 9, 's': 6, 't': 9, 'u': 6, 'v': 3, 'w': 3, 'x': 2, 'y': 3,
                 'z': 2
 }
 
+# read in bot's discord token from an outside file
+TOKEN = open("token.txt", "r").read()
 
-def main():
-    # Fill tile bag
-    tile_bag = []
-    for letter in distribution:
-        for i in range(distribution[letter]):
-            tile_bag.append(letter)
+GUILD = "Messing with Bots"
 
-    players = CircularLinkedList()
-    response = ""
-    while True:
-        response = input("What is your name and username? (user:response) ") # TO BE REPLACED WITH DISCORD.PY
+# create an instance of a client object - the bot is the client
+client = discord.Client()
 
-        # Checks for invalid input
-        if ':' not in response:
-            print("Invalid Input: ':' not in input")
-        elif response[-1] == ':':
-            print("Invalid Input: user not specified")
-        elif response[0] == ':':
-            print("Invalid Input: response not included")
+@client.event
+# runs when bot successfully connects to discord
+async def on_ready():
+    # bot retrieves name of current server (defined in GUILD variable)
+    # from list of servers (guilds) that the bot is connected to
+    guild = discord.utils.get(client.guilds, name=GUILD)
+    
+    # print statements print to the local Python console
+    print(
+        f'{client.user} is connected to the following guild:\n'
+        f'{guild.name}(id: {guild.id})'
+    )
 
-        else:
-            response_tup = split(response)
 
-            # Checks to see if game is ready to be played
-            if response_tup[1] == "!play":
-                break
-
-            # Creates player and adds it to players
-            player = Player(response_tup[1], response_tup[0])
-            if players.head is None:    #grants vip privileges if player is first in players
-                player.vip = True
-            players.add_node(Node(player))
-            print(players)
-
-        print()
+@client.event
+# runs every time a message is sent in a channel the bot can see
+async def on_message(message):
+    # this is true if the bot is the author of the message
+    # this prevents the bot from reacting to its own messages
+    if message.author == client.user:
+        return
+    
+    # ignores non-command messages
+    if not message.content.startswith('$'):
+        return
+    
+    command = message.content[1:] # removes dollar sign from command message
+    
+    print(command)
+    
+    # def main():
+    #     # Fill tile bag
+    #     tile_bag = []
+    #     for letter in distribution:
+    #         for i in range(distribution[letter]):
+    #             tile_bag.append(letter)
+    
+    #     players = CircularLinkedList()
+    #     response = ""
+    #     while True:
+    #         response = input("What is your name and username? (user:response) ") # TO BE REPLACED WITH DISCORD.PY
+    
+    #         # Checks for invalid input
+    #         if ':' not in response:
+    #             print("Invalid Input: ':' not in input")
+    #         elif response[-1] == ':':
+    #             print("Invalid Input: user not specified")
+    #         elif response[0] == ':':
+    #             print("Invalid Input: response not included")
+    
+    #         else:
+    #             response_tup = split(response)
+    
+    #             # Checks to see if game is ready to be played
+    #             if response_tup[1] == "!play":
+    #                 break
+    
+    #             # Creates player and adds it to players
+    #             player = Player(response_tup[1], response_tup[0])
+    #             if players.head is None:    #grants vip privileges if player is first in players
+    #                 player.vip = True
+    #             players.add_node(Node(player))
+    #             print(players)
+    
+    #         print()
 
 
 # Player has a name and a list of words
@@ -160,4 +197,6 @@ def split(string):
     return string[0:index], string[index + 1:len(string)]
 
 
-main()
+#main()
+    
+client.run(TOKEN)
