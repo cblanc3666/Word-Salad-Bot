@@ -48,6 +48,7 @@ async def on_message(message):
     if message.content.startswith('$hello'):
         # returns a msg in the channel where the original msg was received
         await message.channel.send('OI')
+        await message.channel.send(':heart:')
 
 # begins the run loop that makes the bot go online
 client.run(TOKEN)
