@@ -1,7 +1,6 @@
-# commands are start, name [name],
-
 import random
 import discord
+import os
 from discord.ext import commands
 
 command_prefix = '$'
@@ -16,8 +15,6 @@ distribution = {'a': 13, 'b': 3, 'c': 3, 'd': 6, 'e': 18, 'f': 3, 'g': 4, 'h': 3
 
 
 GUILD = "Messing with Bots"
-
-playing = False;
 
 # @@@@@@@@@@@@@@@@@@@@@@@ Define Classes @@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
@@ -67,7 +64,6 @@ class CircularLinkedList:
             return "List is Empty"
         node = self.head
         nodes = []
-        counter = 0
         while True:
             nodes.append(str(node.data))
             node = node.next
@@ -137,8 +133,10 @@ def split(string):
 
 # @@@@@@@@@@@@@@@@@@@@@@@ Actual Game Events Begin @@@@@@@@@@@@@@@@@@@@@@@@@@
     
-playing = False; # indicates when it is ok to start the game
+client.playing = False; # indicates when it is ok to start the game
 players = CircularLinkedList() # create list
+
+# EVENTS
 
 @client.event
 # runs when bot successfully connects to discord
@@ -153,13 +151,38 @@ async def on_ready():
         f'{client.user} is connected to the following guild:\n'
         f'{guild.name}(id: {guild.id})'
     )
+    
+@client.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send('Please pass in all required arguments.')
+
+
+# COMMANDS
+
+# cog infrastructure
+
+# @client.command()
+# async def load(ctx, extension):
+#     client.load_extension(f'cogs.{extension}')
+#     print(f'{extension} cog loaded')
+
+# @client.command()
+# async def unload(ctx, extension):
+#     client.unload_extension(f'cogs.{extension}')
+#     print(f'{extension} cog unloaded')
+
+# for filename in os.listdir('./cogs'):
+#     if filename.endswith('.py'):
+#         client.load_extension(f'cogs.{filename[:-3]}')
+
 
 @client.command()
 async def start(ctx):
-    if playing == True: # can't start the game if already playing
+    if client.playing == True: # can't start the game if already playing
         await ctx.send("Game in progress! Cannot start new game.")
         return # return basically ends the bot interaction with a message
-    playing = True  # we playin now bois
+    client.playing = True  # we playin now bois
     tile_bag = [] # set it up!!
     for letter in distribution:
         for i in range(distribution[letter]):
@@ -171,33 +194,25 @@ async def start(ctx):
     
 @client.command()
 async def name(ctx, *, name):
-    await ctx.send(f"What's poppin, {name}")
+    if client.playing == False:
+        await ctx.send(f"You need to start a game using {command_prefix}start first!")
+        return
     
+    player = Player(name, ctx.message.author.display_name)
+    
+    if players.head is None: #grants vip privileges if player is first
+        player.vip = True
+        
+    players.add_node(Node(player))
+    await ctx.send(name)
+    
+
 
 # @client.command()
 # async def disconnect(ctx):
 #     client.close()
+        
     
-#     if playing == False: # all commands beyond this point apply only while playing
-#         # if the users aren't playing and use any command other than start, 
-#         # this will prompt them to start a game
-#         await message.channel.send("Start a game with 'start' first!")
-#         return
-       
-#     # allows players to enter their names
-#     if command.lower() == 'name':
-#         if len(inputList) < 2:
-#             await message.channel.send("Enter a name!")
-#             return
-#         name = ' '.join(inputList[1:]) # concatenates all but the first word
-#         # this will give all they entered except for the name command
-        
-#         player = Player(name, message.author)
-#         if players.head is None: # grants vip privileges if player is first
-#             player.vip = True
-#         players.add_node(Node(player))
-#         await message.channel.send(name) # TODO: add a message with list of players
-        
     
 # actual command that starts bot    
 client.run('NzA4NTQ2Nzk3MDg1MzkyOTE2.XrY7oA.guqEvcCgqCJwGRFvXLVEc2BjoIk')
