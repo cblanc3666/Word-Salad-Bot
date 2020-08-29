@@ -134,7 +134,7 @@ def split(string):
 # @@@@@@@@@@@@@@@@@@@@@@@ Actual Game Events Begin @@@@@@@@@@@@@@@@@@@@@@@@@@
     
 client.playing = False; # indicates when it is ok to start the game
-players = CircularLinkedList() # create list
+client.players = CircularLinkedList() # create list
 
 # EVENTS
 
@@ -151,11 +151,13 @@ async def on_ready():
         f'{client.user} is connected to the following guild:\n'
         f'{guild.name}(id: {guild.id})'
     )
-    
-@client.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send('Please pass in all required arguments.')
+
+# This was preventing me from seeing other errors so we can uncomment it once we'd reasonable expect to be done debugging
+
+# @client.event
+# async def on_command_error(ctx, error):
+#     if isinstance(error, commands.MissingRequiredArgument):
+#         await ctx.send('Please pass in all required arguments.')
 
 
 # COMMANDS
@@ -183,30 +185,59 @@ async def start(ctx):
         await ctx.send("Game in progress! Cannot start new game.")
         return # return basically ends the bot interaction with a message
     client.playing = True  # we playin now bois
-    tile_bag = [] # set it up!!
+    client.tile_bag = [] # set it up!!
     for letter in distribution:
         for i in range(distribution[letter]):
-            tile_bag.append(letter)
+            client.tile_bag.append(letter)
+
+    # shuffle that bad boy up!
+    random.shuffle(client.tile_bag)
+
+    client.table = [] #represents letters on table
 
     # prompt them for their names
-    await ctx.send(f'Enter "{command_prefix}name [name], and use "play" when all players entered.')
-    return
+    await ctx.send(f'Enter "{command_prefix}name [name], and use "{command_prefix}play" when all players entered.')
+
+@client.command()
+async def rules(ctx):
+    await ctx.send('A set of letter tiles is mixed into a bag. One tile at a time is drawn out of the bag and placed face up on the table (the pool). When more than three tiles are in the pool, any player that sees a word (>3 letters) that can be formed by some subset of the letters in the pool (as an anagram, so no using letters multiple times unless they appear multiple times in the pool) simply calls out the word they see.')
+                   
+    await ctx.send('If the other players agree that the word is a valid anagram of some subset of the letters in the pool, the word is formed and moved in front of that player. Any player can then "steal" that word by using ALL of its letters (in combination with words from the main pool of letters on the table) to create a new word or new words. ALL letters from the stolen word must be used in the new word or words created, although not all letters from the pool need be used. Anagrams that bear significant similarity to the word they are being formed from (for example, adding "S" to make a word plural) are subject to a vote of the players in their best judgement.')
     
 @client.command()
 async def name(ctx, *, name):
     if client.playing == False:
         await ctx.send(f"You need to start a game using {command_prefix}start first!")
         return
-    
-    player = Player(name, ctx.message.author.display_name)
-    
-    if players.head is None: #grants vip privileges if player is first
-        player.vip = True
-        
-    players.add_node(Node(player))
-    await ctx.send(name)
-    
 
+    for playerNode in client.players:
+        if playerNode == None: # no players yet!
+            break
+        if playerNode.data.user == ctx.message.author.display_name:
+            await ctx.send(f"{ctx.message.author.display_name}, you can't enter more than once!")
+            return   
+    
+    newPlayer = Player(name, ctx.message.author.display_name)
+    
+    if client.players.head is None: #grants vip privileges if player is first
+        newPlayer.vip = True
+
+    client.players.add_node(Node(newPlayer))
+    await ctx.send(f"Added {newPlayer.user} as {newPlayer.name}.") 
+        
+@client.command()
+async def play(ctx):
+    if client.playing == False:
+        await ctx.send(f"You need to start a game using {command_prefix}start first!")
+        return
+    
+    client.currentPlayer = client.players.head.data
+    
+    await ctx.send(f"{client.currentPlayer.name}, start us off by drawing a tile using {command_prefix}draw.")
+    
+    
+    
+#TODO - printout name list
 
 # @client.command()
 # async def disconnect(ctx):
