@@ -23,7 +23,7 @@ class Player:
     def __init__(self, name, user=None):
         self.name = name    # The in-game name a player uses
         self.user = user    # The discord username of the player
-        self.words = []
+        self.words = {}
         self.vip = False
 
     def __str__(self):
@@ -33,10 +33,15 @@ class Player:
         return rtn
 
     def add_word(self, word):
-        self.words.append(word)
+        wordStr = ''
+        for letter in str_to_list(word):
+            wordStr += f':regional_indicator_{letter}:'
+            
+        self.words[word] = wordStr
 
     def remove_word(self, word):
-        self.words.remove(word)
+        if word in self.words:
+            del self.words[word]
 
 
 class Node:
@@ -185,13 +190,14 @@ async def start(ctx):
         await ctx.send("Game in progress! Cannot start new game.")
         return # return basically ends the bot interaction with a message
     client.playing = True  # we playin now bois
-    client.tile_bag = [] # set it up!!
+    client.tileBag = [] # set it up!!
+    client.tablePrint = '' # output string
     for letter in distribution:
         for i in range(distribution[letter]):
-            client.tile_bag.append(letter)
+            client.tileBag.append(letter)
 
     # shuffle that bad boy up!
-    random.shuffle(client.tile_bag)
+    random.shuffle(client.tileBag)
 
     client.table = [] #represents letters on table
 
@@ -223,7 +229,7 @@ async def name(ctx, *, name):
         newPlayer.vip = True
 
     client.players.add_node(Node(newPlayer))
-    await ctx.send(f"Added {newPlayer.user} as {newPlayer.name}.") 
+    await ctx.send(f'Added {newPlayer.user} as {newPlayer.name}. \nYou can check who is playing using "{command_prefix}players." \nUse "{command_prefix}play" when all players have entered.')
         
 @client.command()
 async def play(ctx):
@@ -231,13 +237,108 @@ async def play(ctx):
         await ctx.send(f"You need to start a game using {command_prefix}start first!")
         return
     
-    client.currentPlayer = client.players.head.data
+    if len(client.table) > 0: # draw has happened, current player should not be head
+        await ctx.send(f'You already made this command! {client.currentPlayer.data.name}, use "{command_prefix}draw" to continue gameplay.')
+        return
     
-    await ctx.send(f"{client.currentPlayer.name}, start us off by drawing a tile using {command_prefix}draw.")
+    client.currentPlayer = client.players.head
     
+    await ctx.send(f'{client.currentPlayer.data.name}, start us off by drawing a tile using "{command_prefix}draw".')
     
+@client.command()
+async def players(ctx):
+    if client.players.head is None:
+        await ctx.send('No one is playing yet.')
+        return
+        
+    for player in client.players:
+        await ctx.send(player.data)
+        
+@client.command()
+async def draw(ctx):
+    if client.playing == False:
+        await ctx.send(f"You need to start a game using {command_prefix}start first!")
+        return
     
-#TODO - printout name list
+    gameStr = ''
+    newTile = client.tileBag.pop(0)
+    client.table.append(newTile)
+    client.tablePrint += f':regional_indicator_{newTile}:'
+    client.currentPlayer = client.currentPlayer.next
+    
+    gameStr += '**Tile pool:**\n'
+    gameStr +=f'{client.tablePrint}\n'
+    
+    for player in client.players:
+        gameStr += f'**{player.data.name}:**\n'
+        if len(player.data.words) < 1:
+            gameStr += 'No words yet! \n'
+            continue
+        for playerWord in player.data.words:
+            gameStr += f'{player.data.words[playerWord]}\n'
+         
+    gameStr += f'Use "{command_prefix}word [word]" to enter any anagrams you see.\n'
+    
+    gameStr += f'{client.currentPlayer.data.name}, it is your turn to draw using "{command_prefix}draw"'
+    
+    await ctx.send(gameStr)
+    
+@client.command()
+async def word(ctx, word):
+    if client.playing == False:
+        await ctx.send(f"You need to start a game using {command_prefix}start first!")
+        return
+    
+    # clean up the word
+    word = word.lower()
+    
+    valid = False
+    gameStr = ''
+    
+    author = ctx.message.author.display_name
+    for player in client.players:
+        if player.data.user == author:
+            sender = player  # sender is always a player object
+            break
+    
+    poolLetters = compare('', word, client.table)
+    if len(poolLetters) > 0:
+        valid = True
+    
+    for player in client.players:
+        if len(player.data.words) < 1:
+            continue # no words to check
+        for playerWord in player.data.words:
+            poolLetters = compare(playerWord, word, client.table)
+            if len(poolLetters) > 0: # match found
+                valid = True
+                del player.data.words[playerWord] # remove matched word
+                break
+    
+    if not valid:
+        await ctx.send(f"Sorry {sender.data.name}, that word is not a valid anagram.")
+        return
+    
+    sender.data.add_word(word)
+    gameStr += f"Nice job, {sender.data.name}, you got the word {word}! \n"
+    
+    # remove requisite tiles from pool    
+    for poolLetter in poolLetters:
+        client.table.remove(poolLetter)
+        client.tablePrint = client.tablePrint.replace(f':regional_indicator_{poolLetter}:', '')
+    
+    client.currentPlayer = sender
+    
+    gameStr += f'{client.currentPlayer.data.name}, it is your turn to draw using "{command_prefix}draw"'
+            
+    await ctx.send(gameStr)
+        
+
+#TODO - two word melds into anagrams
+#TODO - disconnect command
+#TODO - show number of tiles remaining, game end logistics, scoring
+#TODO - voting functionality so players can determine whether a word is legitimate
+#TODO - undo functionality to undo a certain move 
 
 # @client.command()
 # async def disconnect(ctx):

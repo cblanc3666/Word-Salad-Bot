@@ -53,7 +53,11 @@ def test():
     llist2.add_node(Node('b'))
     print(llist2)
 
-            
+def test1():
+    llist = CircularLinkedList([Player('name', 'username'), Player('name1','username1')])    
+    player = llist.head
+    player.data.add_word('lol')
+    
 def test2():
     tile_bag = [] # set it up!!
     for letter in distribution:
@@ -66,4 +70,8 @@ def test2():
     
     print(tile_bag)
 
-test()
+
+def test3():
+    print(compare('', 'sad', ['r','s','a','d']))
+
+test1()
