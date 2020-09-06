@@ -3,7 +3,7 @@ import discord
 import os
 from discord.ext import commands
 
-command_prefix = '$'
+command_prefix = ''
 
 # create an instance of a client object - the bot is the client
 client = commands.Bot(command_prefix)
@@ -14,7 +14,7 @@ distribution = {'a': 13, 'b': 3, 'c': 3, 'd': 6, 'e': 18, 'f': 3, 'g': 4, 'h': 3
 }
 
 
-GUILD = "Messing with Bots"
+GUILD = "The Domino & Machine Community"
 
 # @@@@@@@@@@@@@@@@@@@@@@@ Define Classes @@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
@@ -229,7 +229,7 @@ async def name(ctx, *, name):
         newPlayer.vip = True
 
     client.players.add_node(Node(newPlayer))
-    await ctx.send(f'Added {newPlayer.user} as {newPlayer.name}. \nYou can check who is playing using "{command_prefix}players." \nUse "{command_prefix}play" when all players have entered.')
+    await ctx.send(f'Added **{newPlayer.user}** as **{newPlayer.name}**. \nYou can check who is playing using "{command_prefix}players." \nUse "{command_prefix}play" when all players have entered.')
         
 @client.command()
 async def play(ctx):
@@ -243,7 +243,7 @@ async def play(ctx):
     
     client.currentPlayer = client.players.head
     
-    await ctx.send(f'{client.currentPlayer.data.name}, start us off by drawing a tile using "{command_prefix}draw".')
+    await ctx.send(f'**{client.currentPlayer.data.name}**, start us off by drawing a tile using "{command_prefix}draw".')
     
 @client.command()
 async def players(ctx):
@@ -258,6 +258,10 @@ async def players(ctx):
 async def draw(ctx):
     if client.playing == False:
         await ctx.send(f"You need to start a game using {command_prefix}start first!")
+        return
+    
+    if ctx.message.author.display_name != client.currentPlayer.data.user:
+        await ctx.send("Oi! It's not your turn!")
         return
     
     gameStr = ''
@@ -279,7 +283,7 @@ async def draw(ctx):
          
     gameStr += f'Use "{command_prefix}word [word]" to enter any anagrams you see.\n'
     
-    gameStr += f'{client.currentPlayer.data.name}, it is your turn to draw using "{command_prefix}draw"'
+    gameStr += f'**{client.currentPlayer.data.name}**, it is your turn to draw using "{command_prefix}draw"'
     
     await ctx.send(gameStr)
     
@@ -316,11 +320,11 @@ async def word(ctx, word):
                 break
     
     if not valid:
-        await ctx.send(f"Sorry {sender.data.name}, that word is not a valid anagram.")
+        await ctx.send(f"So close, **{sender.data.name}**!! That word is not a valid anagram :two_hearts:")
         return
     
     sender.data.add_word(word)
-    gameStr += f"Nice job, {sender.data.name}, you got the word {word}! \n"
+    gameStr += f"Nice job, **{sender.data.name}**, you got the word **{word.upper()}**! \n"
     
     # remove requisite tiles from pool    
     for poolLetter in poolLetters:
@@ -329,7 +333,7 @@ async def word(ctx, word):
     
     client.currentPlayer = sender
     
-    gameStr += f'{client.currentPlayer.data.name}, it is your turn to draw using "{command_prefix}draw"'
+    gameStr += f'**{client.currentPlayer.data.name}**, it is your turn to draw using "{command_prefix}draw"'
             
     await ctx.send(gameStr)
         
@@ -339,6 +343,14 @@ async def word(ctx, word):
 #TODO - show number of tiles remaining, game end logistics, scoring
 #TODO - voting functionality so players can determine whether a word is legitimate
 #TODO - undo functionality to undo a certain move 
+#TODO - something to prevent other people for drawing for another player UNLESS we have to (timer runs out and they're afk, or we votekick them)
+#TODO validate against names with asterisks or underscores or whatever fucky wucky stuff (quotes, backslashes - try to limit to letters and numbers). NO REPEAT NAMES
+#TODO add a command that tells everyone whose turn it is
+#TODO: is there a way to just have the bot scan every one-word message in the chat for acceptable answers? To avoid the need for .word entirely? Otherwise, command prefix of nothing and maybe "w" instead of "word"
+    
+#BUG FIX: ARIA in my game with joel and lyle
+#BUG FIX: Won't let you rearrange word in place (change WAYFAIR to FAIRWAY) - ONLY LET PEOPLE DO THIS FOR THEIR OWN WORDS, and don't make it jump to their turn to draw if it's just a rearrange
+    
 
 # @client.command()
 # async def disconnect(ctx):
