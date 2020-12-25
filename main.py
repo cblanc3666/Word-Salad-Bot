@@ -14,7 +14,7 @@ distribution = {'a': 13, 'b': 3, 'c': 3, 'd': 6, 'e': 18, 'f': 3, 'g': 4, 'h': 3
 }
 
 
-GUILD = "The Domino & Machine Community"
+GUILD = "Messing with Bots"
 
 # @@@@@@@@@@@@@@@@@@@@@@@ Define Classes @@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
@@ -200,6 +200,7 @@ async def start(ctx):
     random.shuffle(client.tileBag)
 
     client.table = [] #represents letters on table
+    client.numPlaying = 0 #represents number of players
 
     # prompt them for their names
     await ctx.send(f'Enter "{command_prefix}name [name], and use "{command_prefix}play" when all players entered.')
@@ -229,6 +230,7 @@ async def name(ctx, *, name):
         newPlayer.vip = True
 
     client.players.add_node(Node(newPlayer))
+    client.numPlaying += 1
     await ctx.send(f'Added **{newPlayer.user}** as **{newPlayer.name}**. \nYou can check who is playing using "{command_prefix}players." \nUse "{command_prefix}play" when all players have entered.')
         
 @client.command()
@@ -319,9 +321,14 @@ async def word(ctx, word):
                 del player.data.words[playerWord] # remove matched word
                 break
     
+    if word.length < 4:
+        valid = False
+    
     if not valid:
         await ctx.send(f"So close, **{sender.data.name}**!! That word is not a valid anagram :two_hearts:")
         return
+    
+    
     
     sender.data.add_word(word)
     gameStr += f"Nice job, **{sender.data.name}**, you got the word **{word.upper()}**! \n"
@@ -347,6 +354,7 @@ async def word(ctx, word):
 #TODO validate against names with asterisks or underscores or whatever fucky wucky stuff (quotes, backslashes - try to limit to letters and numbers). NO REPEAT NAMES
 #TODO add a command that tells everyone whose turn it is
 #TODO: is there a way to just have the bot scan every one-word message in the chat for acceptable answers? To avoid the need for .word entirely? Otherwise, command prefix of nothing and maybe "w" instead of "word"
+#TODO: You will probably never do this, but use a dictionary instead of whatever the fuck you have in there right now to preserve the relation between player names and nicknames
     
 #BUG FIX: ARIA in my game with joel and lyle
 #BUG FIX: Won't let you rearrange word in place (change WAYFAIR to FAIRWAY) - ONLY LET PEOPLE DO THIS FOR THEIR OWN WORDS, and don't make it jump to their turn to draw if it's just a rearrange
