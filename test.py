@@ -72,6 +72,6 @@ def test2():
 
 
 def test3():
-    print(compare('', 'sad', ['r','s','a','d']))
+    print(compare(['d', 'e', 'a', 'l'], 'dealers', ['r','s','e']))
 
-test1()
+test3()

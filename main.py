@@ -1,9 +1,9 @@
 import random
 import discord
-import os
+import asyncio
 from discord.ext import commands
 
-command_prefix = ''
+command_prefix = '.'
 
 # create an instance of a client object - the bot is the client
 client = commands.Bot(command_prefix)
@@ -301,35 +301,61 @@ async def word(ctx, word):
     valid = False
     gameStr = ''
     
+    # find the nickname of the sender of the message
     author = ctx.message.author.display_name
     for player in client.players:
         if player.data.user == author:
             sender = player  # sender is always a player object
             break
     
-    poolLetters = compare('', word, client.table)
-    if len(poolLetters) > 0:
-        valid = True
+    if len(word) > 3: # if this isn't true it won't be valid
+        # if word is entirely a subset of tiles in pool
+        poolLetters = compare('', word, client.table)
+        if len(poolLetters) > 0:
+            valid = True
     
-    for player in client.players:
-        if len(player.data.words) < 1:
-            continue # no words to check
-        for playerWord in player.data.words:
-            poolLetters = compare(playerWord, word, client.table)
-            if len(poolLetters) > 0: # match found
-                valid = True
-                del player.data.words[playerWord] # remove matched word
-                break
-    
-    if word.length < 4:
-        valid = False
+        for player in client.players:
+            if len(player.data.words) < 1:
+                continue # no words to check
+            # check to see if a word already made allows for creation
+            # of the given word
+            for playerWord in player.data.words:
+                poolLetters = compare(playerWord, word, client.table)
+                if len(poolLetters) > 0: # match found
+                    valid = True
+                    del player.data.words[playerWord] # remove matched word
+                    break
     
     if not valid:
         await ctx.send(f"So close, **{sender.data.name}**!! That word is not a valid anagram :two_hearts:")
         return
     
+    # add voting options
+    await ctx.message.add_reaction('👍')
+    await ctx.message.add_reaction('👎')
     
+    await ctx.send("Looks good to me, but y'all should vote! You have 2 minutes to approve.")
+       
+    # returns true if consensus, else false
+    def check(reaction, user):
+        reaccs = ctx.message.reactions
+        if ((reaccs[0].count-1) > client.numPlaying/2) or ((reaccs[1].count-1) > client.numPlaying/2):
+            return True
+        else:
+            return False
     
+    # start the wait loop that only breaks when a consensus made
+    try:
+        reaction, user = await client.wait_for('reaction_add', timeout = 120.0, check = check)
+    except asyncio.TimeoutError:
+        await ctx.channel.send("Looks like you couldn't decide! I'm going to move on to the next word now.")
+        return
+    else:
+        # if consensus against 
+        if ((ctx.message.reactions[1].count-1) > client.numPlaying/2):
+            await ctx.channel.send("Looks like the consensus is against you.")
+            return
+  
     sender.data.add_word(word)
     gameStr += f"Nice job, **{sender.data.name}**, you got the word **{word.upper()}**! \n"
     
