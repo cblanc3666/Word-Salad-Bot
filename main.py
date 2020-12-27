@@ -24,7 +24,7 @@ class Player:
         self.name = name    # The in-game name a player uses
         self.user = user    # The discord username of the player
         self.words = {}
-        self.vip = False
+        self.vip = False #VIP function doesn't actually give the player anything at this point
 
     def __str__(self):
         rtn = "{}: {}".format(self.user, self.name)
@@ -53,7 +53,7 @@ class Node:
         return self.data
 
 
-class CircularLinkedList:
+class LinkedList:
     def __init__(self, nodes=None):
         self.head = None    # a Node
         if nodes is not None:   # iterates through iterable nodes and links one to the next
@@ -62,7 +62,7 @@ class CircularLinkedList:
             for elem in nodes:
                 node.next = Node(data=elem)
                 node = node.next
-            node.next = self.head   # links the last node to the first
+            node.next = None   # last node has no next
 
     def __repr__(self):
         if self.head is None:
@@ -72,7 +72,7 @@ class CircularLinkedList:
         while True:
             nodes.append(str(node.data))
             node = node.next
-            if node == self.head:   # if all nodes have been added to list
+            if node == None:   # if all nodes have been added to list
                 nodes.append(str(node.data))
                 break
         nodes.append("...")
@@ -83,35 +83,47 @@ class CircularLinkedList:
         while True:
             yield node
             node = node.next
-            if node == self.head:   # iterate until loop is complete
+            if node == None:   # iterate until loop is complete
                 return
 
-    def add_node(self, node):   #adds node to the "end" of the circular linked list
+    def add_node(self, node):   #adds node to the "end" of the linked list
         if self.head is None:
             self.head = node
-            self.head.next = self.head
+            self.head.next = None
             return "empty"
         for current_node in self:
-            if current_node.next == self.head:  # if the "end" has been reached
+            if current_node.next == None:  # if the "end" has been reached
                 current_node.next = node    #insert node
-                node.next = self.head   # link back to head
+                node.next = None   # link to none
+            
+    def push_node(self, node): #adds node to head of linked list
+        node.next = self.head
+        self.head = node
 
-    def remove_node(self, node):    # remove node from circular linked list
+    def remove_node(self, node):    # remove node from linked list
         for current_node in self:
             if current_node.next.data == node.data:     # if target node is found
                 current_node.next = current_node.next.next  # skip over target node
                 return
+            
+    def pop_node(self): # pops from the head
+        # assumes there is data to pop
+        popped_node = self.head # pop the head
+        self.head = self.head.next # make the next node the head
+        return popped_node
 
 # Returns the letters that need to be removed from the pool
 # If the word is invalid, an empty list is returned
 def compare(test_word, new_word, pool):
     pool_letters = []   # list of returned letters
+    pool_copy = pool.copy()
     test_list = str_to_list(test_word)
     for letter in new_word:
         if letter in test_list:
             test_list.remove(letter)    # keeps track of which letters have been used already
-        elif letter in pool:
+        elif letter in pool_copy:
             pool_letters.append(letter)
+            pool_copy.remove(letter)
         else:               # If a certain letter is not in the word or pool,
             return []       # comparison is invalid
     if len(test_list) == 0 and len(pool_letters) > 0:   # If all of the letters in test_word were used, and if some
@@ -136,10 +148,31 @@ def split(string):
             break
     return string[0:index], string[index + 1:len(string)]
 
+def print_board(client):
+    # takes the client object
+    if client.playing == False: # can't print board if no game
+        return f'Cannot print board! Start a game using "{command_prefix}start" first.'
+    elif client.players.head == None: # can't print board if no players
+        return f'Cannot print board! Add players using "{command_prefix}name" first.'
+    gameStr = '**Tile pool:**\n'
+    gameStr +=f'{client.tablePrint}\n'
+    for player in client.players:
+        gameStr += f'**{player.data.name}:**\n'
+        if len(player.data.words) < 1:
+            gameStr += 'No words yet! \n'
+            continue
+        for playerWord in player.data.words:
+            gameStr += f'{player.data.words[playerWord]}\n'
+         
+    gameStr += f'Use "{command_prefix}word [word]" to enter any anagrams you see.\n'
+    
+    gameStr += f'**{client.currentPlayer.data.name}**, it is your turn to draw using "{command_prefix}draw"'
+    
+    return gameStr
+
 # @@@@@@@@@@@@@@@@@@@@@@@ Actual Game Events Begin @@@@@@@@@@@@@@@@@@@@@@@@@@
     
 client.playing = False; # indicates when it is ok to start the game
-client.players = CircularLinkedList() # create list
 
 # EVENTS
 
@@ -189,6 +222,16 @@ async def start(ctx):
     if client.playing == True: # can't start the game if already playing
         await ctx.send("Game in progress! Cannot start new game.")
         return # return basically ends the bot interaction with a message
+    client.players = LinkedList() # create list of player objects
+
+    # move storage format is a list of 
+    # player that got the word (player object)
+    # word they got
+    # list of letters used from pool
+    # list of people's words used (if any) [TODO: Make this a list]
+    # list of people whose words were used (player object) [TODO: Make this a list]
+    client.moves = LinkedList()
+        
     client.playing = True  # we playin now bois
     client.tileBag = [] # set it up!!
     client.tablePrint = '' # output string
@@ -230,6 +273,9 @@ async def name(ctx, *, name):
         newPlayer.vip = True
 
     client.players.add_node(Node(newPlayer))
+    
+    #make this player the current player
+    client.currentPlayer = client.players.head
     client.numPlaying += 1
     await ctx.send(f'Added **{newPlayer.user}** as **{newPlayer.name}**. \nYou can check who is playing using "{command_prefix}players." \nUse "{command_prefix}play" when all players have entered.')
         
@@ -242,8 +288,6 @@ async def play(ctx):
     if len(client.table) > 0: # draw has happened, current player should not be head
         await ctx.send(f'You already made this command! {client.currentPlayer.data.name}, use "{command_prefix}draw" to continue gameplay.')
         return
-    
-    client.currentPlayer = client.players.head
     
     await ctx.send(f'**{client.currentPlayer.data.name}**, start us off by drawing a tile using "{command_prefix}draw".')
     
@@ -266,28 +310,22 @@ async def draw(ctx):
         await ctx.send("Oi! It's not your turn!")
         return
     
-    gameStr = ''
-    newTile = client.tileBag.pop(0)
+    newTile = client.tileBag.pop()
+    
+    # change table output
     client.table.append(newTile)
     client.tablePrint += f':regional_indicator_{newTile}:'
-    client.currentPlayer = client.currentPlayer.next
     
-    gameStr += '**Tile pool:**\n'
-    gameStr +=f'{client.tablePrint}\n'
+    # add move to moves list
+    client.moves.push_node(Node([None, None, [newTile], [], []]))
     
-    for player in client.players:
-        gameStr += f'**{player.data.name}:**\n'
-        if len(player.data.words) < 1:
-            gameStr += 'No words yet! \n'
-            continue
-        for playerWord in player.data.words:
-            gameStr += f'{player.data.words[playerWord]}\n'
-         
-    gameStr += f'Use "{command_prefix}word [word]" to enter any anagrams you see.\n'
-    
-    gameStr += f'**{client.currentPlayer.data.name}**, it is your turn to draw using "{command_prefix}draw"'
-    
-    await ctx.send(gameStr)
+    # move to next player
+    if client.currentPlayer.next == None:
+        client.currentPlayer = client.players.head
+    else:
+        client.currentPlayer = client.currentPlayer.next
+
+    await ctx.send(print_board(client))
     
 @client.command()
 async def word(ctx, word):
@@ -300,6 +338,8 @@ async def word(ctx, word):
     
     valid = False
     gameStr = ''
+    stolenWord = None # default is no words stolen
+    stolenPlayer = None
     
     # find the nickname of the sender of the message
     author = ctx.message.author.display_name
@@ -309,22 +349,25 @@ async def word(ctx, word):
             break
     
     if len(word) > 3: # if this isn't true it won't be valid
-        # if word is entirely a subset of tiles in pool
+
         poolLetters = compare('', word, client.table)
+        # if word is entirely a subset of tiles in pool
         if len(poolLetters) > 0:
             valid = True
-    
-        for player in client.players:
-            if len(player.data.words) < 1:
-                continue # no words to check
-            # check to see if a word already made allows for creation
-            # of the given word
-            for playerWord in player.data.words:
-                poolLetters = compare(playerWord, word, client.table)
-                if len(poolLetters) > 0: # match found
-                    valid = True
-                    del player.data.words[playerWord] # remove matched word
-                    break
+        else:
+            for player in client.players:
+                if len(player.data.words) < 1:
+                    continue # no words to check
+                # check to see if a word already made allows for creation
+                # of the given word
+                for playerWord in player.data.words:
+                    poolLetters = compare(playerWord, word, client.table)
+                    if len(poolLetters) > 0: # match found
+                        valid = True
+                        del player.data.words[playerWord] # remove matched word
+                        stolenWord = playerWord
+                        stolenPlayer = player
+                        break
     
     if not valid:
         await ctx.send(f"So close, **{sender.data.name}**!! That word is not a valid anagram :two_hearts:")
@@ -356,21 +399,69 @@ async def word(ctx, word):
             await ctx.channel.send("Looks like the consensus is against you.")
             return
   
+    # @@@@@@@@@@@@ THEY GOT THE WORD!
     sender.data.add_word(word)
     gameStr += f"Nice job, **{sender.data.name}**, you got the word **{word.upper()}**! \n"
+    
+ 
+    thisMove = [sender, word, poolLetters, [stolenWord], [stolenPlayer]]
+    
+    # add move to moves list
+    client.moves.push_node(Node(thisMove))
     
     # remove requisite tiles from pool    
     for poolLetter in poolLetters:
         client.table.remove(poolLetter)
-        client.tablePrint = client.tablePrint.replace(f':regional_indicator_{poolLetter}:', '')
+        client.tablePrint = client.tablePrint.replace(f':regional_indicator_{poolLetter}:', '', 1)
     
     client.currentPlayer = sender
     
-    gameStr += f'**{client.currentPlayer.data.name}**, it is your turn to draw using "{command_prefix}draw"'
-            
-    await ctx.send(gameStr)
+    await ctx.send(gameStr + print_board(client))
         
+    
+@client.command()
+async def undo(ctx):
+    if client.moves.head is None:
+        await ctx.send("No moves to undo!")
+        return
+        
+    move = client.moves.pop_node().data
+    if move[0] == None: # the move to be undone is a draw move
+        client.table.remove(move[2][0]) # remove from table
+        client.tablePrint = client.tablePrint.replace(f':regional_indicator_{move[2][0]}:', '', 1)
+        client.tileBag.append(move[2][0])
+        
+        await ctx.send(print_board(client))
+        return
+    
+    # remove word from player
+    for player in client.players:
+        if player.data.user == move[0].data.user: # find player that got the word
+            player.data.remove_word(move[1])
+    
+    # put tiles back on table
+    for poolLetter in move[2]:
+        client.table.append(poolLetter)
+        client.tablePrint += f':regional_indicator_{poolLetter}:'
+    
+    # return words to other people
+    for i in range(len(move[3])): # loops over number of words they used. it's 1 if no word stolen
+        if move[3][i] == None:
+            break
+        for player in client.players:
+            if player.data.user == move[4][i].data.user: #find player whose word stolen
+                player.data.add_word(move[3][i]) #give them word back
+    
+    await ctx.send(print_board(client))
 
+
+@client.command()
+async def show(ctx):
+    await ctx.send(print_board(client))
+
+#TO TEST: UNDO FEATURE WITH STOLEN WORD
+
+#TODO - Lock other people out of drawing or saying words when voting is happening on one person's word
 #TODO - two word melds into anagrams
 #TODO - disconnect command
 #TODO - show number of tiles remaining, game end logistics, scoring
@@ -378,9 +469,11 @@ async def word(ctx, word):
 #TODO - undo functionality to undo a certain move 
 #TODO - something to prevent other people for drawing for another player UNLESS we have to (timer runs out and they're afk, or we votekick them)
 #TODO validate against names with asterisks or underscores or whatever fucky wucky stuff (quotes, backslashes - try to limit to letters and numbers). NO REPEAT NAMES
+    #TODO prevent people having the same names
 #TODO add a command that tells everyone whose turn it is
 #TODO: is there a way to just have the bot scan every one-word message in the chat for acceptable answers? To avoid the need for .word entirely? Otherwise, command prefix of nothing and maybe "w" instead of "word"
-#TODO: You will probably never do this, but use a dictionary instead of whatever the fuck you have in there right now to preserve the relation between player names and nicknames
+#TODO: You will probably never do this, but use a dictionary instead of whatever the fuck you have in there right now to preserve the relation between player names and nicknames'
+#TODO: allow VIP to designate new VIP, make it so that it won't accept a draw from anyone except the person whose turn it is (OR VIP OVERRIDE)
     
 #BUG FIX: ARIA in my game with joel and lyle
 #BUG FIX: Won't let you rearrange word in place (change WAYFAIR to FAIRWAY) - ONLY LET PEOPLE DO THIS FOR THEIR OWN WORDS, and don't make it jump to their turn to draw if it's just a rearrange

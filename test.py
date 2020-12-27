@@ -1,4 +1,4 @@
-from main import compare, Player, Node, CircularLinkedList
+from main import compare, Player, Node, LinkedList
 import random
 
 distribution = {'a': 13, 'b': 3, 'c': 3, 'd': 6, 'e': 18, 'f': 3, 'g': 4, 'h': 3, 'i': 12, 'j': 2, 'k': 2, 'l': 5,
@@ -72,6 +72,6 @@ def test2():
 
 
 def test3():
-    print(compare(['d', 'e', 'a', 'l'], 'dealers', ['r','s','e']))
+    print(compare(['p', 'a', 'r', 'i', 's'], 'parills', ['i','l','n']))
 
 test3()
