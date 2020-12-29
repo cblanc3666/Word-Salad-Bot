@@ -164,7 +164,7 @@ def print_board(client):
         for playerWord in player.data.words:
             gameStr += f'{player.data.words[playerWord]}\n'
          
-    gameStr += f'Use "{command_prefix}word [word]" to enter any anagrams you see.\n'
+    gameStr += f'Enter any anagrams you see as a single word, .\n'
     
     gameStr += f'**{client.currentPlayer.data.name}**, it is your turn to draw using "{command_prefix}draw"'
     
@@ -197,6 +197,119 @@ async def on_ready():
 #     if isinstance(error, commands.MissingRequiredArgument):
 #         await ctx.send('Please pass in all required arguments.')
 
+@client.event
+async def on_message(msg):
+    if msg.author == client.user:
+        return # bot won't reply to itself
+    
+    if msg.content == ''.join(filter(str.isalpha, msg.content)): # if a single word is entered
+        word = msg.content
+        if client.playing == False:
+            await msg.channel.send(f"You need to start a game using {command_prefix}start first!")
+            return
+        
+        if client.currentPlayer is None:
+            await msg.channel.send(f"You need to use the command {command_prefix}play first!")
+            return
+        
+        if client.voting:
+            await msg.channel.send("Another vote in progress!")
+            return
+    
+        # clean up the word
+        word = word.lower()
+    
+        valid = False
+        repeatWord = False
+        gameStr = ''
+        stolenWord = None # default is no words stolen
+        stolenPlayer = None
+    
+        # find the nickname of the sender of the message
+        author = msg.author.display_name
+        for player in client.players:
+            if player.data.user == author:
+                sender = player  # sender is always a player object
+                break
+    
+        if len(word) > 3: # if this isn't true it won't be valid
+            for player in client.players: # check for a steal (prioritize steal over pool formation)
+                if len(player.data.words) < 1:
+                    continue # no words to check
+                # check to see if a word already made allows for creation
+                # of the given word
+                for playerWord in player.data.words:
+                    if word == playerWord:
+                        repeatWord = True
+                        break
+                    poolLetters = compare(playerWord, word, client.table)
+                    if len(poolLetters) > 0: # match found
+                        valid = True
+                        stolenWord = playerWord
+                        stolenPlayer = player
+                        break
+            if not valid and not repeatWord: # we found no steal and the word isn't a repeat
+                poolLetters = compare('', word, client.table)
+                # if word is entirely a subset of tiles in pool
+                if len(poolLetters) > 0: # but we found a pool combo
+                    valid = True
+                
+        if not valid:
+            await msg.channel.send(f"So close, **{sender.data.name}**!! That word is not a valid anagram :two_hearts:")
+            return
+    
+        # looks good to the bot - add voting options
+        await msg.add_reaction('👍')
+        await msg.add_reaction('👎')
+        client.voting = True
+    
+        await msg.channel.send("Looks good to me, but y'all should vote! You have 2 minutes to approve.")
+           
+        # returns true if consensus, else false
+        def check(reaction, user):
+            reaccs = msg.reactions
+            if ((reaccs[0].count-1) > client.numPlaying/2) or ((reaccs[1].count-1) > client.numPlaying/2):
+                return True
+            else:
+                return False
+    
+        # start the wait loop that only breaks when a consensus made
+        try:
+            reaction, user = await client.wait_for('reaction_add', timeout = 120.0, check = check)
+        except asyncio.TimeoutError:
+            await msg.channel.send("Looks like you couldn't decide! I'm going to move on to the next word now.")
+            return
+        else:
+            # if consensus against 
+            if ((msg.reactions[1].count-1) > client.numPlaying/2):
+                await msg.channel.send("Looks like the consensus is against you.")
+                return
+      
+        # @@@@@@@@@@@@ THEY GOT THE WORD!
+        client.voting = False
+        sender.data.add_word(word)
+        if stolenPlayer != None:
+            del stolenPlayer.data.words[stolenWord] # remove matched word
+        gameStr += f"Nice job, **{sender.data.name}**, you got the word **{word.upper()}**! \n"
+        
+     
+        thisMove = [sender, word, poolLetters, [stolenWord], [stolenPlayer]]
+        
+        # add move to moves list
+        client.moves.push_node(Node(thisMove))
+        
+        # remove requisite tiles from pool    
+        for poolLetter in poolLetters:
+            client.table.remove(poolLetter)
+            client.tablePrint = client.tablePrint.replace(f':regional_indicator_{poolLetter}:', '', 1)
+        
+        client.currentPlayer = sender
+        
+        await msg.channel.send(gameStr + print_board(client))
+        
+    # all of that above only happens if they send a word
+    
+    await client.process_commands(msg)
 
 # COMMANDS
 
@@ -231,8 +344,9 @@ async def start(ctx):
     # list of people's words used (if any) [TODO: Make this a list]
     # list of people whose words were used (player object) [TODO: Make this a list]
     client.moves = LinkedList()
-        
+    client.currentPlayer = None
     client.playing = True  # we playin now bois
+    client.voting = False # only true when active voting occurring
     client.tileBag = [] # set it up!!
     client.tablePrint = '' # output string
     for letter in distribution:
@@ -259,6 +373,10 @@ async def name(ctx, *, name):
     if client.playing == False:
         await ctx.send(f"You need to start a game using {command_prefix}start first!")
         return
+    
+    if client.voting:
+        await ctx.send("Wait for this vote to finish and then join!")
+        return
 
     for playerNode in client.players:
         if playerNode == None: # no players yet!
@@ -271,11 +389,11 @@ async def name(ctx, *, name):
     
     if client.players.head is None: #grants vip privileges if player is first
         newPlayer.vip = True
+        
 
     client.players.add_node(Node(newPlayer))
     
-    #make this player the current player
-    client.currentPlayer = client.players.head
+    
     client.numPlaying += 1
     await ctx.send(f'Added **{newPlayer.user}** as **{newPlayer.name}**. \nYou can check who is playing using "{command_prefix}players." \nUse "{command_prefix}play" when all players have entered.')
         
@@ -284,6 +402,12 @@ async def play(ctx):
     if client.playing == False:
         await ctx.send(f"You need to start a game using {command_prefix}start first!")
         return
+    
+    if client.voting:
+        await ctx.send("You're already playing - go vote!")
+        return
+    
+    client.currentPlayer = client.players.head #start us out with the VIP going first
     
     if len(client.table) > 0: # draw has happened, current player should not be head
         await ctx.send(f'You already made this command! {client.currentPlayer.data.name}, use "{command_prefix}draw" to continue gameplay.')
@@ -306,8 +430,16 @@ async def draw(ctx):
         await ctx.send(f"You need to start a game using {command_prefix}start first!")
         return
     
+    if client.currentPlayer is None:
+        await ctx.send(f"You need to use the command {command_prefix}play first!")
+        return
+    
     if ctx.message.author.display_name != client.currentPlayer.data.user:
         await ctx.send("Oi! It's not your turn!")
+        return
+    
+    if client.voting:
+        await ctx.send("You can't draw right now - go vote!")
         return
     
     newTile = client.tileBag.pop()
@@ -328,103 +460,15 @@ async def draw(ctx):
     await ctx.send(print_board(client))
     
 @client.command()
-async def word(ctx, word):
-    if client.playing == False:
-        await ctx.send(f"You need to start a game using {command_prefix}start first!")
-        return
-    
-    # clean up the word
-    word = word.lower()
-    
-    valid = False
-    gameStr = ''
-    stolenWord = None # default is no words stolen
-    stolenPlayer = None
-    
-    # find the nickname of the sender of the message
-    author = ctx.message.author.display_name
-    for player in client.players:
-        if player.data.user == author:
-            sender = player  # sender is always a player object
-            break
-    
-    if len(word) > 3: # if this isn't true it won't be valid
-
-        poolLetters = compare('', word, client.table)
-        # if word is entirely a subset of tiles in pool
-        if len(poolLetters) > 0:
-            valid = True
-        else:
-            for player in client.players:
-                if len(player.data.words) < 1:
-                    continue # no words to check
-                # check to see if a word already made allows for creation
-                # of the given word
-                for playerWord in player.data.words:
-                    poolLetters = compare(playerWord, word, client.table)
-                    if len(poolLetters) > 0: # match found
-                        valid = True
-                        del player.data.words[playerWord] # remove matched word
-                        stolenWord = playerWord
-                        stolenPlayer = player
-                        break
-    
-    if not valid:
-        await ctx.send(f"So close, **{sender.data.name}**!! That word is not a valid anagram :two_hearts:")
-        return
-    
-    # add voting options
-    await ctx.message.add_reaction('👍')
-    await ctx.message.add_reaction('👎')
-    
-    await ctx.send("Looks good to me, but y'all should vote! You have 2 minutes to approve.")
-       
-    # returns true if consensus, else false
-    def check(reaction, user):
-        reaccs = ctx.message.reactions
-        if ((reaccs[0].count-1) > client.numPlaying/2) or ((reaccs[1].count-1) > client.numPlaying/2):
-            return True
-        else:
-            return False
-    
-    # start the wait loop that only breaks when a consensus made
-    try:
-        reaction, user = await client.wait_for('reaction_add', timeout = 120.0, check = check)
-    except asyncio.TimeoutError:
-        await ctx.channel.send("Looks like you couldn't decide! I'm going to move on to the next word now.")
-        return
-    else:
-        # if consensus against 
-        if ((ctx.message.reactions[1].count-1) > client.numPlaying/2):
-            await ctx.channel.send("Looks like the consensus is against you.")
-            return
-  
-    # @@@@@@@@@@@@ THEY GOT THE WORD!
-    sender.data.add_word(word)
-    gameStr += f"Nice job, **{sender.data.name}**, you got the word **{word.upper()}**! \n"
-    
- 
-    thisMove = [sender, word, poolLetters, [stolenWord], [stolenPlayer]]
-    
-    # add move to moves list
-    client.moves.push_node(Node(thisMove))
-    
-    # remove requisite tiles from pool    
-    for poolLetter in poolLetters:
-        client.table.remove(poolLetter)
-        client.tablePrint = client.tablePrint.replace(f':regional_indicator_{poolLetter}:', '', 1)
-    
-    client.currentPlayer = sender
-    
-    await ctx.send(gameStr + print_board(client))
-        
-    
-@client.command()
 async def undo(ctx):
     if client.moves.head is None:
         await ctx.send("No moves to undo!")
         return
         
+    if client.voting:
+        await ctx.send("You can't undo right now - go vote!")
+        return
+    
     move = client.moves.pop_node().data
     if move[0] == None: # the move to be undone is a draw move
         client.table.remove(move[2][0]) # remove from table
@@ -459,23 +503,19 @@ async def undo(ctx):
 async def show(ctx):
     await ctx.send(print_board(client))
 
-#TO TEST: UNDO FEATURE WITH STOLEN WORD
-
+#BUG FIX - when you steal a word but people vote you down, the word you steal is still deleted
+#BUG FIX - undo cannot bring back words that were deleted by the previous bug
+#BUG FIX - when you steal a word and use tiles from the pool, those tiles aren't properly removed
 #TODO - Lock other people out of drawing or saying words when voting is happening on one person's word
 #TODO - two word melds into anagrams
 #TODO - disconnect command
 #TODO - show number of tiles remaining, game end logistics, scoring
-#TODO - voting functionality so players can determine whether a word is legitimate
-#TODO - undo functionality to undo a certain move 
 #TODO - something to prevent other people for drawing for another player UNLESS we have to (timer runs out and they're afk, or we votekick them)
 #TODO validate against names with asterisks or underscores or whatever fucky wucky stuff (quotes, backslashes - try to limit to letters and numbers). NO REPEAT NAMES
     #TODO prevent people having the same names
-#TODO add a command that tells everyone whose turn it is
-#TODO: is there a way to just have the bot scan every one-word message in the chat for acceptable answers? To avoid the need for .word entirely? Otherwise, command prefix of nothing and maybe "w" instead of "word"
 #TODO: You will probably never do this, but use a dictionary instead of whatever the fuck you have in there right now to preserve the relation between player names and nicknames'
 #TODO: allow VIP to designate new VIP, make it so that it won't accept a draw from anyone except the person whose turn it is (OR VIP OVERRIDE)
     
-#BUG FIX: ARIA in my game with joel and lyle
 #BUG FIX: Won't let you rearrange word in place (change WAYFAIR to FAIRWAY) - ONLY LET PEOPLE DO THIS FOR THEIR OWN WORDS, and don't make it jump to their turn to draw if it's just a rearrange
     
 
