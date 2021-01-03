@@ -14,7 +14,8 @@ distribution = {'a': 13, 'b': 3, 'c': 3, 'd': 6, 'e': 18, 'f': 3, 'g': 4, 'h': 3
 }
 
 
-GUILD = "Messing with Bots"
+GUILD = "The Domino & Machine Community"
+client.playChannel = None
 
 # @@@@@@@@@@@@@@@@@@@@@@@ Define Classes @@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
@@ -24,6 +25,7 @@ class Player:
         self.name = name    # The in-game name a player uses
         self.user = user    # The discord username of the player
         self.words = {}
+        self.score = 0
         self.vip = False #VIP function doesn't actually give the player anything at this point
 
     def __str__(self):
@@ -126,8 +128,11 @@ def compare(test_word, new_word, pool):
             pool_copy.remove(letter)
         else:               # If a certain letter is not in the word or pool,
             return []       # comparison is invalid
-    if len(test_list) == 0 and len(pool_letters) > 0:   # If all of the letters in test_word were used, and if some
-        return pool_letters                             # letters from the pool were used, comparison is valid
+    if len(test_list) == 0:   # If all of the letters in test_word were used,
+        if len(pool_letters) > 0:
+            return pool_letters # if some letters from the pool were used, comparison is valid
+        else:
+            return ['1'] # return if rearrangement
     return []
 
 
@@ -154,8 +159,8 @@ def print_board(client):
         return f'Cannot print board! Start a game using "{command_prefix}start" first.'
     elif client.players.head == None: # can't print board if no players
         return f'Cannot print board! Add players using "{command_prefix}name" first.'
-    gameStr = '**Tile pool:**\n'
-    gameStr +=f'{client.tablePrint}\n'
+    gameStr = ''
+
     for player in client.players:
         gameStr += f'**{player.data.name}:**\n'
         if len(player.data.words) < 1:
@@ -163,12 +168,52 @@ def print_board(client):
             continue
         for playerWord in player.data.words:
             gameStr += f'{player.data.words[playerWord]}\n'
+            if len(gameStr) >= 1700 and '@@@' not in gameStr: # prevent exceeding 2000 limit
+                gameStr += '@@@' # TODO THIS IS NOT ELEGANT
          
-    gameStr += f'Enter any anagrams you see as a single word, .\n'
+    gameStr += '**Tile pool:**\n'  
+    gameStr +=f'{client.tablePrint}\n'
+        
+    gameStr += f'Enter any anagrams you see as a single word.\n'
     
     gameStr += f'**{client.currentPlayer.data.name}**, it is your turn to draw using "{command_prefix}draw"'
     
-    return gameStr
+    gameStrLst = gameStr.split('@@@')
+    
+    return gameStrLst
+
+# check to see if word can be stolen from a combination of two or more on the table
+def check_steal(client, allWords, word):
+    wordLetters = str_to_list(word)
+    usableWords = allWords.copy()
+    for playerWord in allWords.keys():
+        for letter in playerWord:
+            if letter not in wordLetters: # player word can't be stolen - contains letter that was not entered
+                del usableWords[playerWord]
+                break
+    
+    if len(usableWords) < 2: # no combo possible
+        return ([], [], [])
+    
+    allWordList = list(usableWords.keys())
+    
+    for i in range(len(usableWords)): # for each word
+        for j in range(i+1, len(usableWords)): # all other words
+            word1 = allWordList[i]
+            word2 = allWordList[j]
+            if len(word1) + len(word2) > len(word):
+                continue
+            poolLetters = compare(word1+word2, word, client.table) #test those combined bois
+            if len(poolLetters) > 0:
+                stolenWords = [word1, word2]
+                stolenPlayers = [usableWords[word1], usableWords[word2]]
+                if '1' in poolLetters:
+                    poolLetters.remove('1')
+                return (poolLetters, stolenWords, stolenPlayers)
+            
+    # if we went through all of the words but no dice
+    return ([], [], [])
+
 
 # @@@@@@@@@@@@@@@@@@@@@@@ Actual Game Events Begin @@@@@@@@@@@@@@@@@@@@@@@@@@
     
@@ -202,7 +247,7 @@ async def on_message(msg):
     if msg.author == client.user:
         return # bot won't reply to itself
     
-    if msg.content == ''.join(filter(str.isalpha, msg.content)): # if a single word is entered
+    if msg.content == ''.join(filter(str.isalpha, msg.content)) and msg.channel == client.playChannel: # if a single word is entered in the gameplay channel
         word = msg.content
         if client.playing == False:
             await msg.channel.send(f"You need to start a game using {command_prefix}start first!")
@@ -221,9 +266,12 @@ async def on_message(msg):
     
         valid = False
         repeatWord = False
+        loopBreak = False
         gameStr = ''
-        stolenWord = None # default is no words stolen
-        stolenPlayer = None
+        allWords = {} #words as keys, values as players
+        stolenWords = [] # default is no words stolen
+        stolenPlayers = []
+        poolLetters = []
     
         # find the nickname of the sender of the message
         author = msg.author.display_name
@@ -239,21 +287,36 @@ async def on_message(msg):
                 # check to see if a word already made allows for creation
                 # of the given word
                 for playerWord in player.data.words:
-                    if word == playerWord:
+                    if word == playerWord: # check for repeats first because it makes the word invalid if true
                         repeatWord = True
+                        loopBreak = True
                         break
+                    
+                    allWords[playerWord] = player
+                    
                     poolLetters = compare(playerWord, word, client.table)
-                    if len(poolLetters) > 0: # match found
+                    if '1' in poolLetters: # word is a direct anagram with no pool addition
+                        poolLetters.remove('1')
+                    if len(poolLetters) > 0: # match found, valid steal
                         valid = True
-                        stolenWord = playerWord
-                        stolenPlayer = player
+                        loopBreak = True
+                        stolenWords = [playerWord]
+                        stolenPlayers = [player]
                         break
-            if not valid and not repeatWord: # we found no steal and the word isn't a repeat
+                if loopBreak:
+                    break
+            
+            if not valid and not repeatWord: # we found no steal and the word isn't a repeat, check pool formation
                 poolLetters = compare('', word, client.table)
                 # if word is entirely a subset of tiles in pool
-                if len(poolLetters) > 0: # but we found a pool combo
+                if len(poolLetters) > 0 and poolLetters[0] != '1': # but we found a pool combo
                     valid = True
-                
+            
+            if not valid and not repeatWord: # check two word meld
+                (poolLetters, stolenWords, stolenPlayers) = check_steal(client, allWords, word)
+                if len(stolenWords) > 0:
+                    valid = True
+            
         if not valid:
             await msg.channel.send(f"So close, **{sender.data.name}**!! That word is not a valid anagram :two_hearts:")
             return
@@ -278,22 +341,29 @@ async def on_message(msg):
             reaction, user = await client.wait_for('reaction_add', timeout = 120.0, check = check)
         except asyncio.TimeoutError:
             await msg.channel.send("Looks like you couldn't decide! I'm going to move on to the next word now.")
+            client.voting = False
             return
         else:
+            
             # if consensus against 
             if ((msg.reactions[1].count-1) > client.numPlaying/2):
                 await msg.channel.send("Looks like the consensus is against you.")
+                client.voting = False
                 return
       
         # @@@@@@@@@@@@ THEY GOT THE WORD!
         client.voting = False
         sender.data.add_word(word)
-        if stolenPlayer != None:
-            del stolenPlayer.data.words[stolenWord] # remove matched word
+        sender.data.score += len(word)
+        if stolenPlayers != []:
+            for i in range(len(stolenPlayers)):
+                stolenPlayer = stolenPlayers[i]
+                del stolenPlayer.data.words[stolenWords[i]] # remove matched word
+                stolenPlayer.data.score -= len(stolenWords[i])
         gameStr += f"Nice job, **{sender.data.name}**, you got the word **{word.upper()}**! \n"
         
      
-        thisMove = [sender, word, poolLetters, [stolenWord], [stolenPlayer]]
+        thisMove = [sender, word, poolLetters, stolenWords, stolenPlayers]
         
         # add move to moves list
         client.moves.push_node(Node(thisMove))
@@ -305,11 +375,19 @@ async def on_message(msg):
         
         client.currentPlayer = sender
         
-        await msg.channel.send(gameStr + print_board(client))
+        await msg.channel.send(gameStr)
+        gameStrLst = print_board(client)
+        for i in range(len(gameStrLst)):
+            if gameStrLst[i] != '':
+                await msg.channel.send(gameStrLst[i])
+        return
         
     # all of that above only happens if they send a word
     
-    await client.process_commands(msg)
+    if 'start' in msg.content or msg.channel == client.playChannel:
+        await client.process_commands(msg) # all other commands
+    
+    # ignore commands outside of relevant channel
 
 # COMMANDS
 
@@ -336,6 +414,7 @@ async def start(ctx):
         await ctx.send("Game in progress! Cannot start new game.")
         return # return basically ends the bot interaction with a message
     client.players = LinkedList() # create list of player objects
+    client.playChannel = ctx.channel # only read commands in this channel
 
     # move storage format is a list of 
     # player that got the word (player object)
@@ -407,12 +486,12 @@ async def play(ctx):
         await ctx.send("You're already playing - go vote!")
         return
     
-    client.currentPlayer = client.players.head #start us out with the VIP going first
-    
-    if len(client.table) > 0: # draw has happened, current player should not be head
+    if len(client.tileBag) != 144: #draw has happened already
         await ctx.send(f'You already made this command! {client.currentPlayer.data.name}, use "{command_prefix}draw" to continue gameplay.')
         return
     
+    client.currentPlayer = client.players.head #start us out with the VIP going first
+
     await ctx.send(f'**{client.currentPlayer.data.name}**, start us off by drawing a tile using "{command_prefix}draw".')
     
 @client.command()
@@ -434,12 +513,51 @@ async def draw(ctx):
         await ctx.send(f"You need to use the command {command_prefix}play first!")
         return
     
-    if ctx.message.author.display_name != client.currentPlayer.data.user:
-        await ctx.send("Oi! It's not your turn!")
-        return
-    
+    if ctx.message.author.display_name != client.currentPlayer.data.user: # if it's not their turn
+        for player in client.players: # find the player who did send
+            if player.data.user == ctx.message.author.display_name:
+                sender = player.data
+                if not sender.vip: # if they're not VIP
+                    await ctx.send("Oi! It's not your turn!")
+                    return
+                break # if the sender was VIP
+                
+        # otherwise, let them override
+        await ctx.send("It's not your turn. Do you want to VIP override?")
+        await ctx.message.add_reaction('👍')
+        await ctx.message.add_reaction('👎')
+        client.voting = True
+        
+        def check(reaction, user):
+            if reaction != '👍' and reaction != '👎':
+                return False
+            elif user.display_name != sender.user: # if it's not the person who drew that reacted
+                return False
+            return True
+        
+        # start the wait loop that only breaks when a consensus made
+        try:
+            reaction, user = await client.wait_for('reaction_add', timeout = 30.0, check = check)
+        except asyncio.TimeoutError:
+            await ctx.message.channel.send("You did not confirm in time.")
+            client.voting = False
+            return
+        else:
+            client.voting = False
+            # if they thumbs down
+            async for user in ctx.message.reactions[1].users():
+                if user.display_name == sender.user:
+                    await ctx.message.channel.send("Ok, no override.")
+                    return
+            # if they didn't thumb down, they thumbed up, so we draw
+            await ctx.message.channel.send("Ok, override.")
+            
     if client.voting:
         await ctx.send("You can't draw right now - go vote!")
+        return
+    
+    if len(client.tileBag) == 0:
+        await ctx.send(f"Tile bag is empty! Make any last anagrams you see, and then use {command_prefix}end to end the game.")
         return
     
     newTile = client.tileBag.pop()
@@ -457,10 +575,17 @@ async def draw(ctx):
     else:
         client.currentPlayer = client.currentPlayer.next
 
-    await ctx.send(print_board(client))
+    gameStrLst = print_board(client)
+    for i in range(len(gameStrLst)):
+        if gameStrLst[i] != '':
+            await ctx.send(gameStrLst[i])
     
 @client.command()
 async def undo(ctx):
+    if not client.playing:
+        await ctx.send("Can't undo. No game happening.")
+        return
+    
     if client.moves.head is None:
         await ctx.send("No moves to undo!")
         return
@@ -475,13 +600,17 @@ async def undo(ctx):
         client.tablePrint = client.tablePrint.replace(f':regional_indicator_{move[2][0]}:', '', 1)
         client.tileBag.append(move[2][0])
         
-        await ctx.send(print_board(client))
+        gameStrLst = print_board(client)
+        for i in range(len(gameStrLst)):
+            if gameStrLst[i] != '':
+                await ctx.send(gameStrLst[i])
         return
     
     # remove word from player
     for player in client.players:
         if player.data.user == move[0].data.user: # find player that got the word
             player.data.remove_word(move[1])
+            player.data.score -= len(move[1])
     
     # put tiles back on table
     for poolLetter in move[2]:
@@ -495,28 +624,109 @@ async def undo(ctx):
         for player in client.players:
             if player.data.user == move[4][i].data.user: #find player whose word stolen
                 player.data.add_word(move[3][i]) #give them word back
+                player.data.score += len(move[3][i])
     
-    await ctx.send(print_board(client))
+    gameStrLst = print_board(client)
+    for i in range(len(gameStrLst)):
+        if gameStrLst[i] != '':
+            await ctx.send(gameStrLst[i])
+    return
 
 
 @client.command()
 async def show(ctx):
-    await ctx.send(print_board(client))
+    gameStrLst = print_board(client)
+    for i in range(len(gameStrLst)):
+        if gameStrLst[i] != '':
+            await ctx.send(gameStrLst[i])
+    
+@client.command()
+async def stats(ctx):
+    await ctx.send(gen_stats(''))
+ 
+def gen_stats(gameStr):
+    if not client.playing:
+        return 'No game in progress.'
+    for player in client.players:
+        gameStr += f'{player.data.name}: {player.data.score} points \n'
+        
+    gameStr += f'Letters left in bag: {len(client.tileBag)} \n'
+    return gameStr
+
+@client.command()
+async def end(ctx):
+    if not client.playing:
+        await ctx.send('No game to end!')
+        return
+    if client.currentPlayer is None:
+        await ctx.send(f"You need to use the command {command_prefix}play first!")
+        return
+    
+    gameStr = '**FINAL BOARD:**\n'
+    gameStr+= 'Tile pool: \n'
+    gameStr +=f'{client.tablePrint}\n'
+    await ctx.send(gameStr) #TODO fix this
+    gameStr = ''
+    for player in client.players:
+        gameStr += f'**{player.data.name}:**\n'
+        if len(player.data.words) < 1:
+            gameStr += 'No words yet! \n'
+            continue
+        for playerWord in player.data.words:
+            gameStr += f'{player.data.words[playerWord]}\n'
+        await ctx.send(gameStr) #TODO Fix this
+        gameStr = ''
+
+    gameStr += '\n**FINAL SCORES**\n'
+    for player in client.players:
+        gameStr += f'{player.data.name}: {player.data.score} points \n'
+    client.playing = False
+    await ctx.send(gameStr)
+
+@client.command()
+async def commands(ctx):
+    gameStr = f'**Prefix all of these with {command_prefix}** \n \n'
+    gameStr += 'name [name] will add you as a player with the requested nickname. \n'
+    gameStr += 'play will start gameplay. Only use this one once, after all players have been added. \n'
+    gameStr += 'draw will draw a tile from the bag. Only use this after using the play commanded. \n'
+    gameStr += '**Any single word message in this channel will be considered as an anagram.** Anagrams sent before the play command will be invalid. \n'
+    gameStr += 'show will show the current board and prompt the next person to go. \n'
+    gameStr += 'players will show a list of current players \n'
+    gameStr += 'rules will tell you the rules of the game. \n'
+    gameStr += 'undo will undo the last move. \n'
+    gameStr += 'stats will show scores and number of tiles remaining in the bag. \n'
+    gameStr += 'end will end the game at any point and show the final score and table. \n'
+    gameStr += 'commands will list game commands.'
+    
+    await ctx.send(gameStr)
 
 #BUG FIX - when you steal a word but people vote you down, the word you steal is still deleted
 #BUG FIX - undo cannot bring back words that were deleted by the previous bug
 #BUG FIX - when you steal a word and use tiles from the pool, those tiles aren't properly removed
-#TODO - Lock other people out of drawing or saying words when voting is happening on one person's word
-#TODO - two word melds into anagrams
-#TODO - disconnect command
-#TODO - show number of tiles remaining, game end logistics, scoring
-#TODO - something to prevent other people for drawing for another player UNLESS we have to (timer runs out and they're afk, or we votekick them)
+#TO TEST - can VIP override to draw? NOPE, FIX IT
+#TO TEST - can two word melds include from multiple players?
+
+#TODO: MAKE TILEBAG REALLY BIG
+#TODO: add a way to remove players
+#TODO: prevent non-players from inputting words
+#TODO: more elegant fix for 2000 character limit (try to remove the similar code at the end of multiple functions when printing the board) - some words are really big in the new version. also, try to put the tile pool at the bottom
+#TODO: sometimes the bot does the 2 min reminder for failed votes when multiple are simultaneous. try to end all votes that are happening so that doesn't clutter the chat
+#TODO: Order stats in descending score order
+#TODO: finish VIP handoff command (one person to another) - also allow VIP override of long votes
+#TODO: prevent show command during vote!!
 #TODO validate against names with asterisks or underscores or whatever fucky wucky stuff (quotes, backslashes - try to limit to letters and numbers). NO REPEAT NAMES
-    #TODO prevent people having the same names
-#TODO: You will probably never do this, but use a dictionary instead of whatever the fuck you have in there right now to preserve the relation between player names and nicknames'
-#TODO: allow VIP to designate new VIP, make it so that it won't accept a draw from anyone except the person whose turn it is (OR VIP OVERRIDE)
+#TODO prevent people having the same names
+#TODO add more fun stats like number of steals per player, number of steals overall, etc
+#TODO 3+ word melds
+#TO CONSIDER - what if there are multiple different two word melds or multiple different stealable words for an entry?
     
+#TODO - disconnect command
+#TODO - add in a way to save and load from savefiles
 #BUG FIX: Won't let you rearrange word in place (change WAYFAIR to FAIRWAY) - ONLY LET PEOPLE DO THIS FOR THEIR OWN WORDS, and don't make it jump to their turn to draw if it's just a rearrange
+
+#TODO: You will probably never do this, but use a dictionary instead of whatever the fuck you have in there right now to preserve the relation between player names and nicknames
+    
+
     
 
 # @client.command()
