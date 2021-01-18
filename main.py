@@ -170,7 +170,8 @@ def print_board(client):
             gameStr += f'{player.data.words[playerWord]}\n'
             if len(gameStr) >= 1700 and '@@@' not in gameStr: # prevent exceeding 2000 limit
                 gameStr += '@@@' # TODO THIS IS NOT ELEGANT
-         
+        
+    gameStr += '@@@'
     gameStr += '**Tile pool:**\n'  
     gameStr +=f'{client.tablePrint}\n'
         
@@ -674,6 +675,8 @@ async def end(ctx):
             continue
         for playerWord in player.data.words:
             gameStr += f'{player.data.words[playerWord]}\n'
+            if len(gameStr) >= 1700 and '@@@' not in gameStr: # prevent exceeding 2000 limit
+                gameStr += '@@@' # TODO THIS IS NOT ELEGANT
         await ctx.send(gameStr) #TODO Fix this
         gameStr = ''
 
@@ -706,9 +709,11 @@ async def commands(ctx):
 #TO TEST - can VIP override to draw? NOPE, FIX IT
 #TO TEST - can two word melds include from multiple players?
 
+#TODO: when you undo, it should reset whose turn it is
 #TODO: use embedded messages to get around 2000 character issue
 #TODO: add a command to either let players vote others out, and also a .leave command
 #TODO: MAKE TILEBAG REALLY BIG
+#TODO: make it so that the bot doesn't interact with people who aren't playing (which means they can type single words with no interaction)
 #TODO: prevent people who aren't playing from voting
 #TODO: add a way to remove players
 #TODO: handle messages from people who aren't players (only let them use the name command)
