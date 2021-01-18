@@ -12,6 +12,8 @@ HIGH PRIORITY
 
 -When you undo, it should reset whose turn it is
 
+-Allow VIP override to draw
+
 -Prevent people from having the same names
 
 -What if there are multiple different two word melds or multiple different stealable words for an entry?
