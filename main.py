@@ -421,8 +421,8 @@ async def start(ctx):
     # player that got the word (player object)
     # word they got
     # list of letters used from pool
-    # list of people's words used (if any) [TODO: Make this a list]
-    # list of people whose words were used (player object) [TODO: Make this a list]
+    # list of people's words used (if any)
+    # list of people whose words were used (player object)
     client.moves = LinkedList()
     client.currentPlayer = None
     client.playing = True  # we playin now bois
@@ -703,28 +703,18 @@ async def commands(ctx):
     
     await ctx.send(gameStr)
 
-#BUG FIX - when you steal a word but people vote you down, the word you steal is still deleted
-#BUG FIX - undo cannot bring back words that were deleted by the previous bug
-#BUG FIX - when you steal a word and use tiles from the pool, those tiles aren't properly removed
 #TO TEST - can VIP override to draw? NOPE, FIX IT
 #TO TEST - can two word melds include from multiple players?
 
 #TODO: when you undo, it should reset whose turn it is
 #TODO: use embedded messages to get around 2000 character issue
-#TODO: add a command to either let players vote others out, and also a .leave command
-#TODO: MAKE TILEBAG REALLY BIG
-#TODO: make it so that the bot doesn't interact with people who aren't playing (which means they can type single words with no interaction)
-#TODO: prevent people who aren't playing from voting
-#TODO: add a way to remove players
-#TODO: handle messages from people who aren't players (only let them use the name command)
+#TODO: add a command to either let players vote others out, and also a .leave command, and a remove command for VIP only
+#TODO: make it so that the bot doesn't interact with (vote, take words from) people who aren't playing. only let them use the name command
 #TODO: prevent multiple simultaneous end commands? (maybe limit to VIP)
 #TODO: fix scoring (score of a word is equal to number of letters minus 2)
-#TODO: prevent non-players from inputting words
-#TODO: more elegant fix for 2000 character limit (try to remove the similar code at the end of multiple functions when printing the board) - some words are really big in the new version. also, try to put the tile pool at the bottom
 #TODO: sometimes the bot does the 2 min reminder for failed votes when multiple are simultaneous. try to end all votes that are happening so that doesn't clutter the chat
 #TODO: Maybe change the length of the game based on how many people are playing. Could even add a speed game with fewer tiles. Basically have the same distribution but don't use all of the tiles when fewer people play.
 #TODO: Order stats in descending score order
-#TODO: prevent one user from joining multiple times under the same or diff names
 #TODO: finish VIP handoff command (one person to another) - also allow VIP override of long votes. add VIP validation for undo
 #TODO: prevent show command during vote!!
 #TODO validate against names with asterisks or underscores or whatever fucky wucky stuff (quotes, backslashes - try to limit to letters and numbers). NO REPEAT NAMES
