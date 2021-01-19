@@ -667,6 +667,7 @@ async def end(ctx):
     gameStr+= 'Tile pool: \n'
     gameStr +=f'{client.tablePrint}\n'
     await ctx.send(gameStr) #TODO fix this
+    client.playing = False
     gameStr = ''
     for player in client.players:
         gameStr += f'**{player.data.name}:**\n'
@@ -675,7 +676,7 @@ async def end(ctx):
             continue
         for playerWord in player.data.words:
             gameStr += f'{player.data.words[playerWord]}\n'
-            if len(gameStr) >= 1700 and '@@@' not in gameStr: # prevent exceeding 2000 limit
+            if len(gameStr) >= 1700: # prevent exceeding 2000 limit
                 gameStr += '@@@' # TODO THIS IS NOT ELEGANT
         await ctx.send(gameStr) #TODO Fix this
         gameStr = ''
@@ -683,15 +684,15 @@ async def end(ctx):
     gameStr += '\n**FINAL SCORES**\n'
     for player in client.players:
         gameStr += f'{player.data.name}: {player.data.score} points \n'
-    client.playing = False
+
     await ctx.send(gameStr)
 
 @client.command()
 async def commands(ctx):
     gameStr = f'**Prefix all of these with {command_prefix}** \n \n'
     gameStr += 'name [name] will add you as a player with the requested nickname. \n'
-    gameStr += 'play will start gameplay. Only use this one once, after all players have been added. \n'
-    gameStr += 'draw will draw a tile from the bag. Only use this after using the play commanded. \n'
+    gameStr += 'play will start gameplay. Only use this one once, after all players have been added at the beginning. (You can add more players as the game goes on.) \n'
+    gameStr += 'draw will draw a tile from the bag. Only use this after using the play command. \n'
     gameStr += '**Any single word message in this channel will be considered as an anagram.** Anagrams sent before the play command will be invalid. \n'
     gameStr += 'show will show the current board and prompt the next person to go. \n'
     gameStr += 'players will show a list of current players \n'
