@@ -2,6 +2,7 @@ import random
 import discord
 import asyncio
 from discord.ext import commands
+from unicode import emojis
 
 command_prefix = '.'
 
