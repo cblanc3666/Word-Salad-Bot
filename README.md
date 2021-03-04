@@ -6,6 +6,8 @@ Current issues to address, in priority groups:
 
 HIGH PRIORITY
 
+-Change to unicode instead of "regional_indicator_"
+
 -Add command to let players leave, and an option to let players vote someone out. Also add a way for VIP to remove players.
 
 -Use embedded commands or another good solution to avoid the 2000-character limit. Remove the stopgap code being used to do that right now
@@ -17,6 +19,8 @@ HIGH PRIORITY
 -Prevent people from having the same names
 
 -What if there are multiple different two word melds or multiple different stealable words for an entry?
+
+-Two word combine steal does not remove one of the words from the table
 
 
 MEDIUM PRIORITY
@@ -54,3 +58,5 @@ all of the tiles.
 -Add more fun stats like number of steals per player, number of steals overall, etc.
 
 -3+ word melds
+
+-Allow ability to input custom tile pools
