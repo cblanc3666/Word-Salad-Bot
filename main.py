@@ -741,6 +741,6 @@ async def commands(ctx):
     
     
 # actual command that starts bot    
-client.run('NzA4NTQ2Nzk3MDg1MzkyOTE2.XrY7oA.guqEvcCgqCJwGRFvXLVEc2BjoIk')
+client.run('NzA4NTQ2Nzk3MDg1MzkyOTE2.XrY7oA.AZQ0EBtZ5VjyLG7jtPlHAl1F7fg')
 
 
