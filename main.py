@@ -15,7 +15,7 @@ distribution = {'a': 13, 'b': 3, 'c': 3, 'd': 6, 'e': 18, 'f': 3, 'g': 4, 'h': 3
 }
 
 
-GUILD = "The Domino & Machine Community"
+GUILD = "Messing with Bots"
 client.playChannel = None
 
 # @@@@@@@@@@@@@@@@@@@@@@@ Define Classes @@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -38,7 +38,7 @@ class Player:
     def add_word(self, word):
         wordStr = ''
         for letter in str_to_list(word):
-            wordStr += f':regional_indicator_{letter}:'
+            wordStr += emojis[letter]
             
         self.words[word] = wordStr
 
@@ -373,7 +373,7 @@ async def on_message(msg):
         # remove requisite tiles from pool    
         for poolLetter in poolLetters:
             client.table.remove(poolLetter)
-            client.tablePrint = client.tablePrint.replace(f':regional_indicator_{poolLetter}:', '', 1)
+            client.tablePrint = client.tablePrint.replace(emojis[poolLetter], '', 1)
         
         client.currentPlayer = sender
         
@@ -566,7 +566,7 @@ async def draw(ctx):
     
     # change table output
     client.table.append(newTile)
-    client.tablePrint += f':regional_indicator_{newTile}:'
+    client.tablePrint += emojis[newTile]
     
     # add move to moves list
     client.moves.push_node(Node([None, None, [newTile], [], []]))
@@ -599,7 +599,7 @@ async def undo(ctx):
     move = client.moves.pop_node().data
     if move[0] == None: # the move to be undone is a draw move
         client.table.remove(move[2][0]) # remove from table
-        client.tablePrint = client.tablePrint.replace(f':regional_indicator_{move[2][0]}:', '', 1)
+        client.tablePrint = client.tablePrint.replace(emojis[move[2][0]], '', 1)
         client.tileBag.append(move[2][0])
         
         gameStrLst = print_board(client)
@@ -617,7 +617,7 @@ async def undo(ctx):
     # put tiles back on table
     for poolLetter in move[2]:
         client.table.append(poolLetter)
-        client.tablePrint += f':regional_indicator_{poolLetter}:'
+        client.tablePrint += emojis[poolLetter]
     
     # return words to other people
     for i in range(len(move[3])): # loops over number of words they used. it's 1 if no word stolen
