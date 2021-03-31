@@ -8,6 +8,8 @@ HIGH PRIORITY
 
 -Change to unicode instead of "regional_indicator_"
 
+-Fix how you store names vs usernames
+
 -Add command to let players leave, and an option to let players vote someone out. Also add a way for VIP to remove players.
 
 -Use embedded commands or another good solution to avoid the 2000-character limit. Remove the stopgap code being used to do that right now
@@ -15,6 +17,8 @@ HIGH PRIORITY
 -When you undo, it should reset whose turn it is
 
 -Allow VIP override to draw
+
+-When people haven't put in a proper name and try to start playing, you need to tell them to put in names first
 
 -Prevent people from having the same names
 

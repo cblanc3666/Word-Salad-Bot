@@ -39,6 +39,7 @@ class Player:
         wordStr = ''
         for letter in str_to_list(word):
             wordStr += emojis[letter]
+            wordStr += ' '
             
         self.words[word] = wordStr
 
@@ -373,7 +374,7 @@ async def on_message(msg):
         # remove requisite tiles from pool    
         for poolLetter in poolLetters:
             client.table.remove(poolLetter)
-            client.tablePrint = client.tablePrint.replace(emojis[poolLetter], '', 1)
+            client.tablePrint = client.tablePrint.replace(f"{emojis[poolLetter]} ", '', 1)
         
         client.currentPlayer = sender
         
@@ -567,6 +568,7 @@ async def draw(ctx):
     # change table output
     client.table.append(newTile)
     client.tablePrint += emojis[newTile]
+    client.tablePrint += ' '
     
     # add move to moves list
     client.moves.push_node(Node([None, None, [newTile], [], []]))
@@ -599,7 +601,7 @@ async def undo(ctx):
     move = client.moves.pop_node().data
     if move[0] == None: # the move to be undone is a draw move
         client.table.remove(move[2][0]) # remove from table
-        client.tablePrint = client.tablePrint.replace(emojis[move[2][0]], '', 1)
+        client.tablePrint = client.tablePrint.replace(f"{emojis[move[2][0]]} ", '', 1)
         client.tileBag.append(move[2][0])
         
         gameStrLst = print_board(client)
@@ -618,6 +620,7 @@ async def undo(ctx):
     for poolLetter in move[2]:
         client.table.append(poolLetter)
         client.tablePrint += emojis[poolLetter]
+        client.tablePrint += ' '
     
     # return words to other people
     for i in range(len(move[3])): # loops over number of words they used. it's 1 if no word stolen
