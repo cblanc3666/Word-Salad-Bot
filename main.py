@@ -3,6 +3,8 @@ import discord
 import asyncio
 from discord.ext import commands
 from unicode import emojis
+from dotenv import load_dotenv
+import os
 
 command_prefix = '.'
 
@@ -517,12 +519,10 @@ async def draw(ctx):
         await ctx.send(f"You need to use the command {command_prefix}play first!")
         return
     
-    if ctx.message.author.display_name != client.currentPlayer.data.user: # if it's not their turn
-        for player in client.players: # find the player who did send
-            if player.data.user == ctx.message.author.display_name:
-                sender = player.data
-                await ctx.send("Oi! It's not your turn!")
-                return
+    if ctx.message.author.display_name != client.currentPlayer.data.user: 
+        # if it's not their turn
+        await ctx.send("Oi! It's not your turn!")
+        return
                             
     if client.voting:
         await ctx.send("You can't draw right now - go vote!")
@@ -712,6 +712,7 @@ async def commands(ctx):
 
 #TODO: prevent people from having the same names
 #TODO: you should probably work on the mechanics of what happens when one person is alone in a game and they leave
+#TODO: improve the edge case handling of Carson's list implementations
 #TODO: when you undo, it should reset whose turn it is
 #TODO: use embedded messages to get around 2000 character issue
 #TODO: add a command to either let players vote others out, and also a .leave command, and a remove command for VIP only
@@ -742,9 +743,9 @@ async def commands(ctx):
 # async def disconnect(ctx):
 #     client.close()
         
-    
+load_dotenv('.env')
     
 # actual command that starts bot    
-client.run('NzA4NTQ2Nzk3MDg1MzkyOTE2.XrY7oA.AZQ0EBtZ5VjyLG7jtPlHAl1F7fg')
+client.run(os.getenv('BOT_TOKEN'))
 
 
