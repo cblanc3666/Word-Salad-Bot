@@ -15,7 +15,7 @@ distribution = {'a': 13, 'b': 3, 'c': 3, 'd': 6, 'e': 18, 'f': 3, 'g': 4, 'h': 3
 }
 
 
-GUILD = "Messing with Bots"
+GUILD = "The Domino & Machine Community"
 client.playChannel = None
 
 # @@@@@@@@@@@@@@@@@@@@@@@ Define Classes @@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -106,6 +106,13 @@ class LinkedList:
 
     def remove_node(self, node):    # remove node from linked list
         for current_node in self:
+            if current_node.next is None:
+                if self.head.data == node.data:
+                    if self.head.next is None:
+                        self.head = None # remove head
+                    else:
+                        self.head = self.head.next
+                return
             if current_node.next.data == node.data:     # if target node is found
                 current_node.next = current_node.next.next  # skip over target node
                 return
@@ -170,10 +177,8 @@ def print_board(client):
             continue
         for playerWord in player.data.words:
             gameStr += f'{player.data.words[playerWord]}\n'
-            if len(gameStr) >= 1700 and '@@@' not in gameStr: # prevent exceeding 2000 limit
-                gameStr += '@@@' # TODO THIS IS NOT ELEGANT
+    
         
-    gameStr += '@@@'
     gameStr += '**Tile pool:**\n'  
     gameStr +=f'{client.tablePrint}\n'
         
@@ -181,9 +186,8 @@ def print_board(client):
     
     gameStr += f'**{client.currentPlayer.data.name}**, it is your turn to draw using "{command_prefix}draw"'
     
-    gameStrLst = gameStr.split('@@@')
     
-    return gameStrLst
+    return gameStr
 
 # check to see if word can be stolen from a combination of two or more on the table
 def check_steal(client, allWords, word):
@@ -378,11 +382,8 @@ async def on_message(msg):
         
         client.currentPlayer = sender
         
+        gameStr += print_board(client)
         await msg.channel.send(gameStr)
-        gameStrLst = print_board(client)
-        for i in range(len(gameStrLst)):
-            if gameStrLst[i] != '':
-                await msg.channel.send(gameStrLst[i])
         return
         
     # all of that above only happens if they send a word
@@ -520,41 +521,9 @@ async def draw(ctx):
         for player in client.players: # find the player who did send
             if player.data.user == ctx.message.author.display_name:
                 sender = player.data
-                if not sender.vip: # if they're not VIP
-                    await ctx.send("Oi! It's not your turn!")
-                    return
-                break # if the sender was VIP
-                
-        # otherwise, let them override
-        await ctx.send("It's not your turn. Do you want to VIP override?")
-        await ctx.message.add_reaction('👍')
-        await ctx.message.add_reaction('👎')
-        client.voting = True
-        
-        def check(reaction, user):
-            if reaction != '👍' and reaction != '👎':
-                return False
-            elif user.display_name != sender.user: # if it's not the person who drew that reacted
-                return False
-            return True
-        
-        # start the wait loop that only breaks when a consensus made
-        try:
-            reaction, user = await client.wait_for('reaction_add', timeout = 30.0, check = check)
-        except asyncio.TimeoutError:
-            await ctx.message.channel.send("You did not confirm in time.")
-            client.voting = False
-            return
-        else:
-            client.voting = False
-            # if they thumbs down
-            async for user in ctx.message.reactions[1].users():
-                if user.display_name == sender.user:
-                    await ctx.message.channel.send("Ok, no override.")
-                    return
-            # if they didn't thumb down, they thumbed up, so we draw
-            await ctx.message.channel.send("Ok, override.")
-            
+                await ctx.send("Oi! It's not your turn!")
+                return
+                            
     if client.voting:
         await ctx.send("You can't draw right now - go vote!")
         return
@@ -579,10 +548,47 @@ async def draw(ctx):
     else:
         client.currentPlayer = client.currentPlayer.next
 
-    gameStrLst = print_board(client)
-    for i in range(len(gameStrLst)):
-        if gameStrLst[i] != '':
-            await ctx.send(gameStrLst[i])
+    await ctx.send(print_board(client))
+    
+@client.command()
+async def skip(ctx):
+    if not client.playing:
+        await ctx.send("Can't skip. No game in progress.")
+        
+    if client.voting:
+        await ctx.send("You can't skip right now - go vote!")
+        
+    # move to next player
+    if client.currentPlayer.next == None:
+        client.currentPlayer = client.players.head
+    else:
+        client.currentPlayer = client.currentPlayer.next
+        
+    await ctx.send(print_board(client))
+    
+    
+@client.command()
+async def leave(ctx):
+    if not client.playing:
+        await ctx.send("Can't leave. No game to leave.")
+        return
+    
+    for player in client.players: # find the player who did send
+        if player.data.user == ctx.message.author.display_name:
+            sender = player
+            break
+    
+    client.players.remove_node(sender)
+    
+    # move to next player
+    if client.currentPlayer.next == None:
+        # TODO WHAT IF ONLY ONE PLAYER IS LEFT AND THEY JUST LEFT
+        client.currentPlayer = client.players.head
+    else:
+        client.currentPlayer = client.currentPlayer.next
+    
+    await ctx.send(print_board(client))
+    
     
 @client.command()
 async def undo(ctx):
@@ -604,10 +610,7 @@ async def undo(ctx):
         client.tablePrint = client.tablePrint.replace(f"{emojis[move[2][0]]} ", '', 1)
         client.tileBag.append(move[2][0])
         
-        gameStrLst = print_board(client)
-        for i in range(len(gameStrLst)):
-            if gameStrLst[i] != '':
-                await ctx.send(gameStrLst[i])
+        await ctx.send(print_board(client))
         return
     
     # remove word from player
@@ -631,19 +634,13 @@ async def undo(ctx):
                 player.data.add_word(move[3][i]) #give them word back
                 player.data.score += len(move[3][i])
     
-    gameStrLst = print_board(client)
-    for i in range(len(gameStrLst)):
-        if gameStrLst[i] != '':
-            await ctx.send(gameStrLst[i])
+    await ctx.send(print_board(client))
     return
 
 
 @client.command()
 async def show(ctx):
-    gameStrLst = print_board(client)
-    for i in range(len(gameStrLst)):
-        if gameStrLst[i] != '':
-            await ctx.send(gameStrLst[i])
+    await ctx.send(print_board(client))
     
 @client.command()
 async def stats(ctx):
@@ -705,12 +702,16 @@ async def commands(ctx):
     gameStr += 'stats will show scores and number of tiles remaining in the bag. \n'
     gameStr += 'end will end the game at any point and show the final score and table. \n'
     gameStr += 'commands will list game commands.'
+    gameStr += 'leave will remove you from the game'
+    gameStr += 'skip will skip the current person\'s move'
     
     await ctx.send(gameStr)
 
 #TO TEST - can VIP override to draw? NOPE, FIX IT
 #TO TEST - can two word melds include from multiple players?
 
+#TODO: prevent people from having the same names
+#TODO: you should probably work on the mechanics of what happens when one person is alone in a game and they leave
 #TODO: when you undo, it should reset whose turn it is
 #TODO: use embedded messages to get around 2000 character issue
 #TODO: add a command to either let players vote others out, and also a .leave command, and a remove command for VIP only
