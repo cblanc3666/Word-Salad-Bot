@@ -5,6 +5,7 @@ from discord.ext import commands
 from unicode import emojis
 from dotenv import load_dotenv
 import os
+import keep_alive
 
 command_prefix = '.'
 
