@@ -193,7 +193,7 @@ def print_board(client):
     return gameStr
 
 # check to see if word can be stolen from a combination of two or more on the table
-def check_steal(client, allWords, word):
+def check_two_steal(client, allWords, word):
     wordLetters = str_to_list(word)
     usableWords = allWords.copy()
     for playerWord in allWords.keys():
@@ -323,7 +323,7 @@ async def on_message(msg):
                     valid = True
             
             if not valid and not repeatWord: # check two word meld
-                (poolLetters, stolenWords, stolenPlayers) = check_steal(client, allWords, word)
+                (poolLetters, stolenWords, stolenPlayers) = check_two_steal(client, allWords, word)
                 if len(stolenWords) > 0:
                     valid = True
             
@@ -336,7 +336,7 @@ async def on_message(msg):
         await msg.add_reaction('👎')
         client.voting = True
     
-        await msg.channel.send("Looks good to me, but y'all should vote! You have 2 minutes to approve.")
+        #await msg.channel.send("Looks good to me, but y'all should vote! You have 2 minutes to approve.")
            
         # returns true if consensus, else false
         def check(reaction, user):
@@ -711,6 +711,7 @@ async def commands(ctx):
 #TO TEST - can VIP override to draw? NOPE, FIX IT
 #TO TEST - can two word melds include from multiple players?
 
+#TODO: what if someone who isn't playing sends a word?
 #TODO: prevent people from having the same names
 #TODO: you should probably work on the mechanics of what happens when one person is alone in a game and they leave
 #TODO: improve the edge case handling of Carson's list implementations
