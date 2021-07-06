@@ -3,9 +3,11 @@ import discord
 import asyncio
 from discord.ext import commands
 from unicode import emojis
-from dotenv import load_dotenv
+import requests
 import os
 import keep_alive
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 command_prefix = '.'
 
@@ -744,10 +746,8 @@ async def commands(ctx):
 # @client.command()
 # async def disconnect(ctx):
 #     client.close()
-        
-load_dotenv('.env')
-    
-# actual command that starts bot    
-client.run(os.getenv('BOT_TOKEN'))
 
+keep_alive.keep_alive()
+# actual command that starts bot    
+client.run(BOT_TOKEN)
 
